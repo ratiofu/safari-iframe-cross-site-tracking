@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Embedded App</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+      * {
+          box-sizing: border-box;
+      }
+  </style>
+</head>
+<body>
+  <h3>Embedded App</h3>
+  <p id="message">Loading...</p>
+  <button id="sign-in-button" style="display: none">Sign In</button>
+  <button id="sign-out-button" style="display: none">Sign Out</button>
+  <script>
+
+    function apiV1Url(path) {
+      return `https://api.embedded-app.io/api/v1/${path}`;
+    }
+
+    function getControlledWindow(
+      url,
+      options = 'left=100,top=100,width=320,height=240',
+      interval = 1000
+    ) {
+      const connectWindow = window.open(url, 'connectWindow', options);
+      const checkWindowClosed = setInterval(
+        () => {
+          if (connectWindow?.closed) {
+            clearInterval(checkWindowClosed);
+            window.location.reload();
+          }
+        },
+        interval
+      );
+      return checkWindowClosed;
+    }
+
+    function signOut() {
+      fetch(apiV1Url('signout'), { method: 'POST' })
+        .then(() => window.location.reload());
+    }
+
+    async function getUserInfo() {
+      const response = await fetch(apiV1Url('userinfo'));
+      if (response.ok) {
+        const { name } = await response.json();
+        return name;
+      }
+      return null;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const [message, signInButton, signOutButton] =
+        ['message', 'sign-in-button', 'sign-out-button'].map(id => document.getElementById(id));
+      signInButton.addEventListener('click', () => getControlledWindow('/signin'));
+      signOutButton.addEventListener('click', signOut);
+      const name = await getUserInfo();
+      if (name) {
+        signInButton.style.display = 'none';
+        signOutButton.style.display = 'block';
+        message.textContent = `Welcome, ${name}!`;
+      } else {
+        message.textContent = 'Sign in to continue:';
+        signInButton.style.display = 'block';
+        signOutButton.style.display = 'none';
+      }
+    });
+
+  </script>
+</body>
+</html>

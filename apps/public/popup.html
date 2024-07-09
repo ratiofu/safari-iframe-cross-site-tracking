@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Sign In</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+      * {
+          box-sizing: border-box;
+      }
+  </style>
+</head>
+<body>
+  <p>Continue to sign in:</p>
+  <button id="continue-sign-in-button">Continue</button>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const continueSignInButton = document.getElementById('continue-sign-in-button');
+      continueSignInButton.addEventListener('click', () => {
+        fetch('https://api.embedded-app.io/api/v1/authorize', { method: 'POST', credentials: 'include' })
+          .then((response) => {
+            if (response.ok) {
+              window.close();
+            } else {
+              alert('Failed to sign you in!');
+            }
+          });
+      });
+    });
+  </script>
+</body>
+</html>
