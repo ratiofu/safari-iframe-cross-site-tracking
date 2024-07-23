@@ -66,6 +66,8 @@ fastify.addHook('onRequest', async (request, reply) => {
 fastify.addHook('onSend', function handleCors(request, reply, body, next) {
   const host = request.headers.host;
   if (host === 'api.embedded-app.io') {
+    // 💥 important: these access control headers must be set if requests are made to the API
+    //    from the embedded app.
     reply
       .header('Access-Control-Allow-Origin', 'https://app.embedded-app.io')
       .header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
@@ -76,8 +78,13 @@ fastify.addHook('onSend', function handleCors(request, reply, body, next) {
 });
 
 fastify.post('/api/v1/authorize', await onApiHost(async (request, reply) => {
-  setSecureHttpOnlyCookie(reply);
+  setCookie(reply);
   reply.send({ authorized: true });
+}));
+
+fastify.post('/api/v1/signout', await onApiHost(async (request, reply) => {
+  deleteCookie(reply);
+  reply.send({ authorized: false });
 }));
 
 fastify.get('/api/v1/userinfo', await onApiHost(async (request, reply) => {
@@ -89,20 +96,30 @@ fastify.get('/api/v1/userinfo', await onApiHost(async (request, reply) => {
 }));
 
 const COOKIE_NAME = 'embeddedappsession';
+const COOKIE_OPTIONS = {
+  domain: 'embedded-app.io',
+  path: '/',
+  secure: true,
+  httpOnly: true,
+  sameSite: 'none',
+}
 
-function setSecureHttpOnlyCookie(reply) {
+function deleteCookie(reply) {
+  reply.setCookie(COOKIE_NAME, '', {
+    ...COOKIE_OPTIONS,
+    expires: new Date(0),
+  })
+}
+
+function setCookie(reply) {
   reply.setCookie(COOKIE_NAME, Date.now().toString(31), {
-    domain: 'embedded-app.io',
-    path: '/',
-    secure: true,
-    httpOnly: true,
-    sameSite: 'lax',
-    expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+    ...COOKIE_OPTIONS,
+    expires: new Date(Date.now() + 1_000 * 60 * 60 * 24 * 365),
   })
 }
 
 function hasAuthorizationCookie(request) {
-  return !!request.cookies[COOKIE_NAME];
+  return request.cookies[COOKIE_NAME] !== undefined
 }
 
 (async () => {
@@ -113,5 +130,3 @@ function hasAuthorizationCookie(request) {
     process.exit(1)
   }
 })().catch(console.error);
-
-// needed? --experimental-modules

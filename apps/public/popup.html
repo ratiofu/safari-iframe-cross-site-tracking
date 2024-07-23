@@ -15,18 +15,23 @@
   <button id="continue-sign-in-button">Continue</button>
 
   <script>
+
+    async function performSignIn() {
+      const response = await fetch(
+        'https://api.embedded-app.io/api/v1/authorize',
+        // 💥 important: for the 'set-cookie' header to be accepted, the credentials must be set to 'include'
+        { method: 'POST', credentials: 'include' }
+      )
+      if (response.ok) {
+        window.close();
+      } else {
+        alert('Failed to sign you in!');
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       const continueSignInButton = document.getElementById('continue-sign-in-button');
-      continueSignInButton.addEventListener('click', () => {
-        fetch('https://api.embedded-app.io/api/v1/authorize', { method: 'POST', credentials: 'include' })
-          .then((response) => {
-            if (response.ok) {
-              window.close();
-            } else {
-              alert('Failed to sign you in!');
-            }
-          });
-      });
+      continueSignInButton.addEventListener('click', performSignIn);
     });
   </script>
 </body>

@@ -21,9 +21,53 @@
       return `https://api.embedded-app.io/api/v1/${path}`;
     }
 
+    function isRunningInIframe() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /**
+     * 💥 important: This must be run OUTSIDE the event handler in which access is requested, otherwise the
+     *    "event frame" is consumed and a call to document.requestStorageAccess() will throw an 'undefined'
+     *    error or pass silently without actually requesting access.
+     * See: https://developers.google.com/privacy-sandbox/3pcd/storage-access-api
+     * @returns {Promise<boolean>}
+     */
+    async function checkStorageAccess() {
+      const access = document.hasStorageAccess && isRunningInIframe()
+        ? await document.hasStorageAccess()
+        : true // assume true since there's nothing to do if not in iFrame or no storage access API
+      console.log('storage access:', access);
+      return access;
+    }
+
+    let hasAccess = false
+    checkStorageAccess().then(it => hasAccess = it);
+
+    function startSignIn() {
+      const doSignIn = () => getControlledWindow('/signin')
+      console.log('has access?', hasAccess);
+      if (!hasAccess) {
+        console.log('requesting storage access!');
+        document.requestStorageAccess()
+          .then(doSignIn)
+          .catch(error => {
+            // 💥 important: Safari has some very stringent requirements for 3rd party cookies; details here:
+            //    https://webkit.org/blog/11545/updates-to-the-storage-access-api/
+            alert('Failed to get necessary 3rd party privacy exclusion. Please visit https://app.embedded-app.io/ in a new browser tab and sign in there first, then try again.')
+            console.error('failed to request storage access:', error)
+          });
+      } else {
+        doSignIn();
+      }
+    }
+
     function getControlledWindow(
       url,
-      options = 'left=100,top=100,width=320,height=240',
+      options = 'left=10,top=10,width=320,height=240',
       interval = 1000
     ) {
       const connectWindow = window.open(url, 'connectWindow', options);
@@ -40,12 +84,14 @@
     }
 
     function signOut() {
-      fetch(apiV1Url('signout'), { method: 'POST' })
-        .then(() => window.location.reload());
+      // 💥 important: for the 'set-cookie' header to be accepted, the credentials must be set to 'include'
+      fetch(apiV1Url('signout'), { method: 'POST', credentials: 'include' })
+         .then(() => window.location.reload());
     }
 
     async function getUserInfo() {
-      const response = await fetch(apiV1Url('userinfo'));
+      // 💥 important: for the 'cookie' header to be sent, the credentials must be set to 'include'
+      const response = await fetch(apiV1Url('userinfo'), { credentials: 'include' });
       if (response.ok) {
         const { name } = await response.json();
         return name;
@@ -56,7 +102,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const [message, signInButton, signOutButton] =
         ['message', 'sign-in-button', 'sign-out-button'].map(id => document.getElementById(id));
-      signInButton.addEventListener('click', () => getControlledWindow('/signin'));
+      signInButton.addEventListener('click', startSignIn);
       signOutButton.addEventListener('click', signOut);
       const name = await getUserInfo();
       if (name) {
